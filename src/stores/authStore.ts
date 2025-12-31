@@ -1,84 +1,173 @@
-import { User, UserRole } from '@/types';
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { supabase } from '@/integrations/supabase/client';
+import { User, Session } from '@supabase/supabase-js';
+
+export type AppRole = 'admin' | 'student';
+
+interface Profile {
+  id: string;
+  email: string;
+  name: string;
+  department?: string;
+  batch?: string;
+  avatar_url?: string;
+}
 
 interface AuthState {
   user: User | null;
+  session: Session | null;
+  profile: Profile | null;
+  role: AppRole | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string, role: UserRole) => Promise<void>;
-  signup: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
-  logout: () => void;
-  setUser: (user: User | null) => void;
+  initialized: boolean;
+  login: (email: string, password: string) => Promise<{ error: string | null }>;
+  signup: (email: string, password: string, name: string, role: AppRole, department?: string, batch?: string) => Promise<{ error: string | null }>;
+  loginWithGoogle: () => Promise<{ error: string | null }>;
+  logout: () => Promise<void>;
+  initialize: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
-      user: null,
-      isAuthenticated: false,
-      isLoading: false,
+const fetchProfileAndRole = async (userId: string, set: any) => {
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
 
-      login: async (email: string, password: string, role: UserRole) => {
-        set({ isLoading: true });
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        const user: User = {
-          id: crypto.randomUUID(),
-          email,
-          name: email.split('@')[0].replace('.', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-          role,
-          department: role === 'student' ? 'Computer Science (B.Tech)' : 'Placement Cell',
-          batch: role === 'student' ? '2024' : undefined,
-        };
-        
-        set({ user, isAuthenticated: true, isLoading: false });
-      },
+    const { data: roleData } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .maybeSingle();
 
-      signup: async (email: string, password: string, name: string, role: UserRole) => {
-        set({ isLoading: true });
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        const user: User = {
-          id: crypto.randomUUID(),
-          email,
+    set({ 
+      profile: profile as Profile | null,
+      role: (roleData?.role as AppRole) ?? 'student'
+    });
+  } catch (error) {
+    console.error('Error fetching profile/role:', error);
+  }
+};
+
+export const useAuthStore = create<AuthState>((set) => ({
+  user: null,
+  session: null,
+  profile: null,
+  role: null,
+  isAuthenticated: false,
+  isLoading: false,
+  initialized: false,
+
+  initialize: async () => {
+    // Set up auth state listener FIRST
+    supabase.auth.onAuthStateChange((event, session) => {
+      set({ 
+        session, 
+        user: session?.user ?? null,
+        isAuthenticated: !!session?.user 
+      });
+      
+      // Defer profile/role fetch to avoid deadlock
+      if (session?.user) {
+        setTimeout(() => {
+          fetchProfileAndRole(session.user.id, set);
+        }, 0);
+      } else {
+        set({ profile: null, role: null });
+      }
+    });
+
+    // THEN check for existing session
+    const { data: { session } } = await supabase.auth.getSession();
+    set({ 
+      session, 
+      user: session?.user ?? null,
+      isAuthenticated: !!session?.user,
+      initialized: true
+    });
+
+    if (session?.user) {
+      await fetchProfileAndRole(session.user.id, set);
+    }
+  },
+
+  login: async (email: string, password: string) => {
+    set({ isLoading: true });
+    
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    set({ isLoading: false });
+    
+    if (error) {
+      return { error: error.message };
+    }
+    
+    return { error: null };
+  },
+
+  signup: async (email: string, password: string, name: string, role: AppRole, department?: string, batch?: string) => {
+    set({ isLoading: true });
+    
+    const redirectUrl = `${window.location.origin}/`;
+    
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: redirectUrl,
+        data: {
           name,
           role,
-          department: role === 'student' ? 'Computer Science (B.Tech)' : 'Placement Cell',
-          batch: role === 'student' ? '2024' : undefined,
-        };
-        
-        set({ user, isAuthenticated: true, isLoading: false });
+          department: department || (role === 'student' ? 'Computer Science (B.Tech)' : 'Placement Cell'),
+          batch: batch || (role === 'student' ? '2024' : undefined),
+        },
       },
+    });
 
-      loginWithGoogle: async () => {
-        set({ isLoading: true });
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        const user: User = {
-          id: crypto.randomUUID(),
-          email: 'student@college.edu',
-          name: 'Google User',
-          role: 'student',
-          department: 'Computer Science (B.Tech)',
-          batch: '2024',
-        };
-        
-        set({ user, isAuthenticated: true, isLoading: false });
-      },
-
-      logout: () => {
-        set({ user: null, isAuthenticated: false });
-      },
-
-      setUser: (user) => {
-        set({ user, isAuthenticated: !!user });
-      },
-    }),
-    {
-      name: 'auth-storage',
+    set({ isLoading: false });
+    
+    if (error) {
+      if (error.message.includes('already registered')) {
+        return { error: 'This email is already registered. Please log in instead.' };
+      }
+      return { error: error.message };
     }
-  )
-);
+    
+    return { error: null };
+  },
+
+  loginWithGoogle: async () => {
+    set({ isLoading: true });
+    
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/dashboard`,
+      },
+    });
+
+    set({ isLoading: false });
+    
+    if (error) {
+      return { error: error.message };
+    }
+    
+    return { error: null };
+  },
+
+  logout: async () => {
+    await supabase.auth.signOut();
+    set({ 
+      user: null, 
+      session: null, 
+      profile: null, 
+      role: null, 
+      isAuthenticated: false 
+    });
+  },
+}));

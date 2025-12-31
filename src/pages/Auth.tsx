@@ -1,46 +1,80 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '@/stores/authStore';
-import { UserRole } from '@/types';
-import { GraduationCap, Mail, Lock, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
+import { useAuthStore, AppRole } from '@/stores/authStore';
+import { GraduationCap, Mail, Lock, Eye, EyeOff, ArrowRight, Loader2, User } from 'lucide-react';
 import heroCampus from '@/assets/hero-campus.jpg';
 
 export default function AuthPage() {
   const navigate = useNavigate();
-  const { login, signup, loginWithGoogle, isLoading } = useAuthStore();
+  const { login, signup, loginWithGoogle, isLoading, isAuthenticated, role, initialize, initialized } = useAuthStore();
   
   const [isLoginMode, setIsLoginMode] = useState(true);
-  const [role, setRole] = useState<UserRole>('student');
+  const [selectedRole, setSelectedRole] = useState<AppRole>('student');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
+
+  useEffect(() => {
+    if (initialized && isAuthenticated && role) {
+      navigate(role === 'admin' ? '/admin' : '/dashboard');
+    }
+  }, [initialized, isAuthenticated, role, navigate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
+    if (!email || !password) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    if (!isLoginMode && !name) {
+      setError('Please enter your full name');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
     try {
+      let result;
       if (isLoginMode) {
-        await login(email, password, role);
+        result = await login(email, password);
       } else {
-        await signup(email, password, name, role);
+        result = await signup(email, password, name, selectedRole);
       }
-      navigate(role === 'admin' ? '/admin' : '/dashboard');
+      
+      if (result.error) {
+        setError(result.error);
+      }
     } catch (err) {
       setError('Authentication failed. Please try again.');
     }
   };
 
   const handleGoogleLogin = async () => {
-    try {
-      await loginWithGoogle();
-      navigate('/dashboard');
-    } catch (err) {
-      setError('Google login failed. Please try again.');
+    const result = await loginWithGoogle();
+    if (result.error) {
+      setError(result.error);
     }
   };
+
+  if (!initialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex">
@@ -89,9 +123,13 @@ export default function AuthPage() {
       <div className="flex-1 flex items-center justify-center p-8 bg-background">
         <div className="w-full max-w-md animate-fade-in">
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-foreground mb-2">Welcome Back</h2>
+            <h2 className="text-3xl font-bold text-foreground mb-2">
+              {isLoginMode ? 'Welcome Back' : 'Create Account'}
+            </h2>
             <p className="text-muted-foreground">
-              Please enter your details to access your dashboard.
+              {isLoginMode 
+                ? 'Please enter your details to access your dashboard.'
+                : 'Fill in your details to get started.'}
             </p>
           </div>
 
@@ -120,20 +158,22 @@ export default function AuthPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Role Selector */}
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
-                I am a
-              </label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as UserRole)}
-                className="input-field"
-              >
-                <option value="student">Student</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
+            {/* Role Selector (signup only) */}
+            {!isLoginMode && (
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  I am a
+                </label>
+                <select
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value as AppRole)}
+                  className="input-field"
+                >
+                  <option value="student">Student</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+            )}
 
             {/* Name (signup only) */}
             {!isLoginMode && (
@@ -141,14 +181,17 @@ export default function AuthPage() {
                 <label className="block text-sm font-medium text-foreground mb-2">
                   Full Name
                 </label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Enter your full name"
-                  className="input-field"
-                  required
-                />
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Enter your full name"
+                    className="input-field pl-12"
+                    required={!isLoginMode}
+                  />
+                </div>
               </div>
             )}
 
@@ -191,6 +234,7 @@ export default function AuthPage() {
                   placeholder="Enter your password"
                   className="input-field pl-12 pr-12"
                   required
+                  minLength={6}
                 />
                 <button
                   type="button"
@@ -203,7 +247,7 @@ export default function AuthPage() {
             </div>
 
             {error && (
-              <p className="text-sm text-destructive">{error}</p>
+              <p className="text-sm text-destructive bg-destructive/10 p-3 rounded-lg">{error}</p>
             )}
 
             {/* Submit Button */}
@@ -268,7 +312,10 @@ export default function AuthPage() {
             {isLoginMode ? "Don't have an account?" : "Already have an account?"}{' '}
             <button
               type="button"
-              onClick={() => setIsLoginMode(!isLoginMode)}
+              onClick={() => {
+                setIsLoginMode(!isLoginMode);
+                setError('');
+              }}
               className="text-primary font-medium hover:underline"
             >
               {isLoginMode ? 'Register your College ID' : 'Log in'}

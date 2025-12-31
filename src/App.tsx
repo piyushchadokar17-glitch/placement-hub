@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useAuthStore } from "@/stores/authStore";
+import { useAuthStore, AppRole } from "@/stores/authStore";
 import AuthPage from "./pages/Auth";
 import StudentDashboard from "./pages/StudentDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -12,25 +12,25 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: ('student' | 'admin')[] }) {
-  const { isAuthenticated, user } = useAuthStore();
+function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: AppRole[] }) {
+  const { isAuthenticated, role } = useAuthStore();
 
   if (!isAuthenticated) {
     return <Navigate to="/auth" replace />;
   }
 
-  if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-    return <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} replace />;
+  if (allowedRoles && role && !allowedRoles.includes(role)) {
+    return <Navigate to={role === 'admin' ? '/admin' : '/dashboard'} replace />;
   }
 
   return <>{children}</>;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, role } = useAuthStore();
 
   if (isAuthenticated) {
-    return <Navigate to={user?.role === 'admin' ? '/admin' : '/dashboard'} replace />;
+    return <Navigate to={role === 'admin' ? '/admin' : '/dashboard'} replace />;
   }
 
   return <>{children}</>;
