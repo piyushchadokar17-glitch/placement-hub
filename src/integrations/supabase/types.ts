@@ -14,16 +14,217 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      companies: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          ctc: string
+          description: string | null
+          drive_date: string
+          eligibility_backlogs_allowed: number | null
+          eligibility_branches: string[] | null
+          eligibility_cgpa: string | null
+          eligibility_class_requirement: string | null
+          id: string
+          location: string
+          logo_url: string | null
+          name: string
+          role: string
+          selection_process: Json | null
+          status: Database["public"]["Enums"]["drive_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          ctc: string
+          description?: string | null
+          drive_date: string
+          eligibility_backlogs_allowed?: number | null
+          eligibility_branches?: string[] | null
+          eligibility_cgpa?: string | null
+          eligibility_class_requirement?: string | null
+          id?: string
+          location: string
+          logo_url?: string | null
+          name: string
+          role: string
+          selection_process?: Json | null
+          status?: Database["public"]["Enums"]["drive_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          ctc?: string
+          description?: string | null
+          drive_date?: string
+          eligibility_backlogs_allowed?: number | null
+          eligibility_branches?: string[] | null
+          eligibility_cgpa?: string | null
+          eligibility_class_requirement?: string | null
+          id?: string
+          location?: string
+          logo_url?: string | null
+          name?: string
+          role?: string
+          selection_process?: Json | null
+          status?: Database["public"]["Enums"]["drive_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          company_id: string
+          content: string
+          created_at: string
+          id: string
+          is_pinned: boolean | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          content: string
+          created_at?: string
+          id?: string
+          is_pinned?: boolean | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_pinned?: boolean | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          batch: string | null
+          created_at: string
+          department: string | null
+          email: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          batch?: string | null
+          created_at?: string
+          department?: string | null
+          email: string
+          id: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          batch?: string | null
+          created_at?: string
+          department?: string | null
+          email?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      registrations: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          status: Database["public"]["Enums"]["application_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["application_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["application_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registrations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_role: {
+        Args: { _user_id: string }
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "student"
+      application_status:
+        | "registered"
+        | "applied"
+        | "shortlisted"
+        | "interviewing"
+        | "selected"
+        | "rejected"
+      drive_status: "upcoming" | "ongoing" | "completed" | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +351,17 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "student"],
+      application_status: [
+        "registered",
+        "applied",
+        "shortlisted",
+        "interviewing",
+        "selected",
+        "rejected",
+      ],
+      drive_status: ["upcoming", "ongoing", "completed", "closed"],
+    },
   },
 } as const

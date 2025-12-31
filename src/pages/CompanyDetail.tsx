@@ -3,16 +3,14 @@ import { Sidebar } from '@/components/Sidebar';
 import { StatusBadge } from '@/components/StatusBadge';
 import { mockCompanies, mockMessages } from '@/data/mockData';
 import { useState } from 'react';
+import { Message, UserRole } from '@/types';
 import { 
-  ArrowLeft, 
   MapPin, 
   IndianRupee, 
-  Clock, 
   Users,
   Calendar,
   Briefcase,
   FileText,
-  Send,
   Pin,
   Check,
 } from 'lucide-react';
@@ -21,10 +19,10 @@ import { useAuthStore } from '@/stores/authStore';
 
 export default function CompanyDetail() {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuthStore();
+  const { user, profile, role } = useAuthStore();
   const company = mockCompanies.find(c => c.id === id);
   const [newMessage, setNewMessage] = useState('');
-  const [messages, setMessages] = useState(mockMessages);
+  const [messages, setMessages] = useState<Message[]>(mockMessages);
 
   if (!company) {
     return (
@@ -36,11 +34,11 @@ export default function CompanyDetail() {
 
   const handleSendMessage = () => {
     if (newMessage.trim()) {
-      const message = {
+      const message: Message = {
         id: crypto.randomUUID(),
         userId: user?.id || '1',
-        userName: user?.name || 'You',
-        userRole: user?.role || 'student' as const,
+        userName: profile?.name || 'You',
+        userRole: (role || 'student') as UserRole,
         content: newMessage,
         timestamp: new Date(),
       };

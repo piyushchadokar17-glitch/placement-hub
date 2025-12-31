@@ -4,7 +4,6 @@ import { StatCard } from '@/components/StatCard';
 import { CompanyCard } from '@/components/CompanyCard';
 import { useAuthStore } from '@/stores/authStore';
 import { mockCompanies, studentStats } from '@/data/mockData';
-import { DriveStatus } from '@/types';
 import { 
   Briefcase, 
   Send, 
@@ -18,7 +17,7 @@ import { toast } from 'sonner';
 type TabType = 'upcoming' | 'ongoing' | 'completed';
 
 export default function StudentDashboard() {
-  const { user } = useAuthStore();
+  const { profile } = useAuthStore();
   const [activeTab, setActiveTab] = useState<TabType>('upcoming');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -53,7 +52,7 @@ export default function StudentDashboard() {
           <div>
             <p className="text-sm text-muted-foreground mb-1">Academic Year 2024-2025</p>
             <h1 className="text-3xl font-bold text-foreground">
-              Welcome back, {user?.name?.split(' ')[0]} 👋
+              Welcome back, {profile?.name?.split(' ')[0] || 'Student'} 👋
             </h1>
             <p className="text-muted-foreground mt-1">
               Here are the latest placement opportunities curated for your profile.
