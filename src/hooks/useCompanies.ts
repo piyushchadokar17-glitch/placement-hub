@@ -1,5 +1,4 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export interface Company {
@@ -23,33 +22,74 @@ export interface Company {
   registration_count?: number;
 }
 
+// Mock company data
+const mockCompanies: Company[] = [
+  {
+    id: '1',
+    name: 'Google',
+    logo_url: 'https://logo.clearbit.com/google.com',
+    location: 'Bangalore, India',
+    role: 'Software Engineer',
+    ctc: '₹30-40 LPA',
+    drive_date: '2024-02-15',
+    status: 'upcoming',
+    description: 'Google is looking for talented software engineers to join their team.',
+    eligibility_cgpa: '7.0',
+    eligibility_branches: ['Computer Science', 'Information Technology'],
+    eligibility_backlogs_allowed: 0,
+    eligibility_class_requirement: 'No Active Backlogs',
+    selection_process: ['Online Test', 'Technical Interview', 'HR Interview'],
+    created_at: '2024-01-01',
+    updated_at: '2024-01-01',
+    registration_count: 45,
+  },
+  {
+    id: '2',
+    name: 'Microsoft',
+    logo_url: 'https://logo.clearbit.com/microsoft.com',
+    location: 'Hyderabad, India',
+    role: 'Software Development Engineer',
+    ctc: '₹25-35 LPA',
+    drive_date: '2024-02-20',
+    status: 'upcoming',
+    description: 'Microsoft is hiring SDEs for their Hyderabad office.',
+    eligibility_cgpa: '6.5',
+    eligibility_branches: ['Computer Science', 'Information Technology', 'Electronics'],
+    eligibility_backlogs_allowed: 2,
+    eligibility_class_requirement: 'No Active Backlogs',
+    selection_process: ['Online Assessment', 'Technical Rounds', 'Managerial Interview'],
+    created_at: '2024-01-02',
+    updated_at: '2024-01-02',
+    registration_count: 38,
+  },
+  {
+    id: '3',
+    name: 'Amazon',
+    logo_url: 'https://logo.clearbit.com/amazon.com',
+    location: 'Bangalore, India',
+    role: 'Software Development Engineer',
+    ctc: '₹28-40 LPA',
+    drive_date: '2024-01-30',
+    status: 'ongoing',
+    description: 'Amazon is looking for SDEs to join their development teams.',
+    eligibility_cgpa: '7.0',
+    eligibility_branches: ['Computer Science', 'Information Technology'],
+    eligibility_backlogs_allowed: 0,
+    eligibility_class_requirement: 'No Active Backlogs',
+    selection_process: ['Online Test', 'Technical Interview', 'Bar Raiser', 'HR Interview'],
+    created_at: '2024-01-03',
+    updated_at: '2024-01-03',
+    registration_count: 52,
+  },
+];
+
 export function useCompanies() {
   return useQuery({
     queryKey: ['companies'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('*')
-        .order('drive_date', { ascending: true });
-
-      if (error) throw error;
-
-      // Get registration counts for each company
-      const companiesWithCounts = await Promise.all(
-        (data || []).map(async (company) => {
-          const { count } = await supabase
-            .from('registrations')
-            .select('*', { count: 'exact', head: true })
-            .eq('company_id', company.id);
-
-          return {
-            ...company,
-            registration_count: count || 0,
-          };
-        })
-      );
-
-      return companiesWithCounts as Company[];
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return mockCompanies;
     },
   });
 }
@@ -58,24 +98,9 @@ export function useCompany(id: string) {
   return useQuery({
     queryKey: ['company', id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      // Get registration count
-      const { count } = await supabase
-        .from('registrations')
-        .select('*', { count: 'exact', head: true })
-        .eq('company_id', id);
-
-      return {
-        ...data,
-        registration_count: count || 0,
-      } as Company;
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return mockCompanies.find(company => company.id === id) || null;
     },
     enabled: !!id,
   });
@@ -86,14 +111,18 @@ export function useCreateCompany() {
 
   return useMutation({
     mutationFn: async (company: Omit<Company, 'id' | 'created_at' | 'updated_at' | 'registration_count'>) => {
-      const { data, error } = await supabase
-        .from('companies')
-        .insert(company)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const newCompany: Company = {
+        ...company,
+        id: Date.now().toString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        registration_count: 0,
+      };
+      
+      return newCompany;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['companies'] });
@@ -110,15 +139,10 @@ export function useUpdateCompany() {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Company> & { id: string }) => {
-      const { data, error } = await supabase
-        .from('companies')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      return { id, ...updates };
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['companies'] });
@@ -136,12 +160,9 @@ export function useDeleteCompany() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('companies')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return id;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['companies'] });

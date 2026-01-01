@@ -1,4 +1,4 @@
-import { Company } from '@/types';
+import { Company } from '@/hooks/useCompanies';
 import { StatusBadge } from './StatusBadge';
 import { MapPin, IndianRupee, Calendar, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -58,7 +58,7 @@ export function CompanyCard({ company, onRegister }: CompanyCardProps) {
             </div>
           </div>
         </div>
-        <StatusBadge variant={company.applicationStatus || company.status} />
+        <StatusBadge variant={company.status} />
       </div>
 
       <h4 className="font-medium text-foreground mb-3">{company.role}</h4>
@@ -70,7 +70,7 @@ export function CompanyCard({ company, onRegister }: CompanyCardProps) {
         </div>
         <div className="flex items-center gap-1">
           <Calendar className="w-4 h-4" />
-          <span>{formatDate(company.driveDate)}</span>
+          <span>{formatDate(company.drive_date)}</span>
         </div>
       </div>
 
@@ -86,10 +86,10 @@ export function CompanyCard({ company, onRegister }: CompanyCardProps) {
               </div>
             ))}
           </div>
-          <span className="text-sm text-muted-foreground">+{company.registeredCount}</span>
+          <span className="text-sm text-muted-foreground">+{company.registration_count}</span>
         </div>
 
-        {company.status === 'upcoming' && !company.applicationStatus && (
+        {company.status === 'upcoming' && (
           <button
             onClick={() => onRegister?.(company.id)}
             className="btn-primary text-sm py-2 px-4"
@@ -98,7 +98,7 @@ export function CompanyCard({ company, onRegister }: CompanyCardProps) {
           </button>
         )}
 
-        {company.applicationStatus === 'applied' && (
+        {company.status === 'ongoing' && (
           <Link
             to={`/company/${company.id}`}
             className="btn-outline text-sm py-2 px-4"

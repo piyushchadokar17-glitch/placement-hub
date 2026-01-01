@@ -4,13 +4,28 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore, AppRole } from "@/stores/authStore";
+import { useEffect } from "react";
 import AuthPage from "./pages/Auth";
 import StudentDashboard from "./pages/StudentDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import CompanyDetail from "./pages/CompanyDetail";
+import Applications from "./pages/Applications";
+import Interviews from "./pages/Interviews";
+import Resume from "./pages/Resume";
+import Resources from "./pages/Resources";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
+
+const AppInitializer = () => {
+  const initialize = useAuthStore((state) => state.initialize);
+
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
+
+  return <AppContent />;
+};
 
 function ProtectedRoute({ children, allowedRoles }: { children: React.ReactNode; allowedRoles?: AppRole[] }) {
   const { isAuthenticated, role } = useAuthStore();
@@ -36,7 +51,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-const App = () => (
+const AppContent = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
@@ -80,7 +95,7 @@ const App = () => (
             path="/applications"
             element={
               <ProtectedRoute allowedRoles={['student']}>
-                <StudentDashboard />
+                <Applications />
               </ProtectedRoute>
             }
           />
@@ -88,7 +103,7 @@ const App = () => (
             path="/interviews"
             element={
               <ProtectedRoute allowedRoles={['student']}>
-                <StudentDashboard />
+                <Interviews />
               </ProtectedRoute>
             }
           />
@@ -96,7 +111,7 @@ const App = () => (
             path="/resume"
             element={
               <ProtectedRoute allowedRoles={['student']}>
-                <StudentDashboard />
+                <Resume />
               </ProtectedRoute>
             }
           />
@@ -104,7 +119,7 @@ const App = () => (
             path="/resources"
             element={
               <ProtectedRoute allowedRoles={['student']}>
-                <StudentDashboard />
+                <Resources />
               </ProtectedRoute>
             }
           />
@@ -155,4 +170,4 @@ const App = () => (
   </QueryClientProvider>
 );
 
-export default App;
+export default AppInitializer;

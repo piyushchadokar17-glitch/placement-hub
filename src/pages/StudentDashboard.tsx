@@ -4,11 +4,13 @@ import { StatCard } from '@/components/StatCard';
 import { CompanyCard } from '@/components/CompanyCard';
 import { useAuthStore } from '@/stores/authStore';
 import { mockCompanies, studentStats } from '@/data/mockData';
-import { 
-  Briefcase, 
-  Send, 
-  Star, 
-  CheckCircle2, 
+import { useCompanies } from '@/hooks/useCompanies';
+import { useRegisterForDrive } from '@/hooks/useRegistrations';
+import {
+  Briefcase,
+  Send,
+  Star,
+  CheckCircle2,
   Search,
   Bell,
 } from 'lucide-react';
@@ -20,32 +22,35 @@ export default function StudentDashboard() {
   const { profile } = useAuthStore();
   const [activeTab, setActiveTab] = useState<TabType>('upcoming');
   const [searchQuery, setSearchQuery] = useState('');
+  const { data: companies = [] } = useCompanies();
+  const registerForDrive = useRegisterForDrive();
 
-  const filteredCompanies = mockCompanies.filter(company => {
-    const matchesTab = activeTab === 'upcoming' 
+  const filteredCompanies = companies.filter(company => {
+    const matchesTab = activeTab === 'upcoming'
       ? company.status === 'upcoming'
       : activeTab === 'ongoing'
-      ? company.status === 'ongoing'
-      : company.status === 'completed' || company.status === 'closed';
-    
-    const matchesSearch = searchQuery === '' || 
+        ? company.status === 'ongoing'
+        : company.status === 'completed' || company.status === 'closed';
+
+    const matchesSearch = searchQuery === '' ||
       company.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       company.role.toLowerCase().includes(searchQuery.toLowerCase());
 
     return matchesTab && matchesSearch;
   });
 
-  const handleRegister = (companyId: string) => {
-    const company = mockCompanies.find(c => c.id === companyId);
-    if (company) {
-      toast.success(`Successfully registered for ${company.name}`);
+  const handleRegister = async (companyId: string) => {
+    try {
+      await registerForDrive.mutateAsync(companyId);
+    } catch (error) {
+      // Error is handled by the mutation hook
     }
   };
 
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
-      
+
       <main className="ml-64 p-8">
         {/* Header */}
         <header className="flex items-center justify-between mb-8">
@@ -107,11 +112,10 @@ export default function StudentDashboard() {
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-all capitalize ${
-                  activeTab === tab
-                    ? 'bg-card text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-all capitalize ${activeTab === tab
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+                  }`}
               >
                 {tab === 'upcoming' ? 'Upcoming Drives' : tab}
               </button>
@@ -133,8 +137,8 @@ export default function StudentDashboard() {
         {/* Company Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredCompanies.map((company, index) => (
-            <div 
-              key={company.id} 
+            <div
+              key={company.id}
               className="animate-fade-in opacity-0"
               style={{ animationDelay: `${index * 0.1}s` }}
             >

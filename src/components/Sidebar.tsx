@@ -35,8 +35,8 @@ const adminNavItems: NavItem[] = [
 
 export function Sidebar() {
   const location = useLocation();
-  const { user, logout } = useAuthStore();
-  const isAdmin = user?.role === 'admin';
+  const { user, profile, logout } = useAuthStore();
+  const isAdmin = profile?.role === 'admin';
   const navItems: NavItem[] = isAdmin ? adminNavItems : studentNavItems;
 
   return (
@@ -61,12 +61,12 @@ export function Sidebar() {
         <div className="flex items-center gap-3 p-3 rounded-lg bg-sidebar-accent/50">
           <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
             <span className="text-sm font-medium text-primary">
-              {user?.name?.split(' ').map(n => n[0]).join('').slice(0, 2)}
+              {profile?.name?.split(' ').map(n => n[0]).join('').slice(0, 2)}
             </span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-foreground truncate">{user?.name}</p>
-            <p className="text-xs text-muted-foreground truncate">{user?.department}</p>
+            <p className="font-medium text-foreground truncate">{profile?.name}</p>
+            <p className="text-xs text-muted-foreground truncate">{profile?.department}</p>
           </div>
         </div>
       </div>

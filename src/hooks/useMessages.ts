@@ -1,8 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
-import { useEffect } from 'react';
 
 export interface Message {
   id: string;
@@ -19,43 +17,46 @@ export interface Message {
   user_role?: 'admin' | 'student';
 }
 
+// Mock message data
+const mockMessages: Message[] = [
+  {
+    id: '1',
+    company_id: '1',
+    user_id: '2',
+    content: 'Google interview tips: Focus on data structures and algorithms. Practice LeetCode medium problems.',
+    is_pinned: true,
+    created_at: '2024-01-10',
+    updated_at: '2024-01-10',
+    profile: {
+      name: 'Admin User',
+      avatar_url: undefined,
+    },
+    user_role: 'admin',
+  },
+  {
+    id: '2',
+    company_id: '1',
+    user_id: '1',
+    content: 'Has anyone appeared for Google interview before? How was the experience?',
+    is_pinned: false,
+    created_at: '2024-01-11',
+    updated_at: '2024-01-11',
+    profile: {
+      name: 'John Student',
+      avatar_url: undefined,
+    },
+    user_role: 'student',
+  },
+];
+
 export function useCompanyMessages(companyId: string) {
   return useQuery({
     queryKey: ['messages', companyId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('company_id', companyId)
-        .order('is_pinned', { ascending: false })
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-
-      // Fetch profiles and roles separately
-      const messagesWithDetails = await Promise.all(
-        (data || []).map(async (msg) => {
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('name, avatar_url')
-            .eq('id', msg.user_id)
-            .maybeSingle();
-
-          const { data: roleData } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', msg.user_id)
-            .maybeSingle();
-
-          return {
-            ...msg,
-            profile: profileData || { name: 'Unknown User' },
-            user_role: roleData?.role as 'admin' | 'student' | undefined,
-          };
-        })
-      );
-
-      return messagesWithDetails as Message[];
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      return mockMessages.filter(msg => msg.company_id === companyId);
     },
     enabled: !!companyId,
   });
@@ -69,18 +70,25 @@ export function useSendMessage() {
     mutationFn: async ({ companyId, content }: { companyId: string; content: string }) => {
       if (!user?.id) throw new Error('Not authenticated');
 
-      const { data, error } = await supabase
-        .from('messages')
-        .insert({
-          company_id: companyId,
-          user_id: user.id,
-          content,
-        })
-        .select()
-        .single();
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      if (error) throw error;
-      return data;
+      const newMessage: Message = {
+        id: Date.now().toString(),
+        company_id: companyId,
+        user_id: user.id,
+        content,
+        is_pinned: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        profile: {
+          name: user.id === '1' ? 'John Student' : 'Admin User',
+          avatar_url: undefined,
+        },
+        user_role: user.id === '1' ? 'student' : 'admin',
+      };
+
+      return newMessage;
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['messages', variables.companyId] });
@@ -96,12 +104,8 @@ export function useDeleteMessage() {
 
   return useMutation({
     mutationFn: async ({ messageId, companyId }: { messageId: string; companyId: string }) => {
-      const { error } = await supabase
-        .from('messages')
-        .delete()
-        .eq('id', messageId);
-
-      if (error) throw error;
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
       return { companyId };
     },
     onSuccess: (data) => {
@@ -119,12 +123,8 @@ export function usePinMessage() {
 
   return useMutation({
     mutationFn: async ({ messageId, companyId, isPinned }: { messageId: string; companyId: string; isPinned: boolean }) => {
-      const { error } = await supabase
-        .from('messages')
-        .update({ is_pinned: isPinned })
-        .eq('id', messageId);
-
-      if (error) throw error;
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
       return { companyId };
     },
     onSuccess: (data) => {
@@ -135,32 +135,4 @@ export function usePinMessage() {
       toast.error(error.message || 'Failed to update message');
     },
   });
-}
-
-export function useRealtimeMessages(companyId: string) {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    if (!companyId) return;
-
-    const channel = supabase
-      .channel(`messages-${companyId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'messages',
-          filter: `company_id=eq.${companyId}`,
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['messages', companyId] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [companyId, queryClient]);
 }

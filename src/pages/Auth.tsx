@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore, AppRole } from '@/stores/authStore';
 import { GraduationCap, Mail, Lock, Eye, EyeOff, ArrowRight, Loader2, User } from 'lucide-react';
+import { toast } from 'sonner';
 import heroCampus from '@/assets/hero-campus.jpg';
 
 export default function AuthPage() {
   const navigate = useNavigate();
   const { login, signup, loginWithGoogle, isLoading, isAuthenticated, role, initialize, initialized } = useAuthStore();
-  
+
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [selectedRole, setSelectedRole] = useState<AppRole>('student');
   const [email, setEmail] = useState('');
@@ -52,7 +53,7 @@ export default function AuthPage() {
       } else {
         result = await signup(email, password, name, selectedRole);
       }
-      
+
       if (result.error) {
         setError(result.error);
       }
@@ -127,7 +128,7 @@ export default function AuthPage() {
               {isLoginMode ? 'Welcome Back' : 'Create Account'}
             </h2>
             <p className="text-muted-foreground">
-              {isLoginMode 
+              {isLoginMode
                 ? 'Please enter your details to access your dashboard.'
                 : 'Fill in your details to get started.'}
             </p>
@@ -137,21 +138,19 @@ export default function AuthPage() {
           <div className="flex bg-muted rounded-lg p-1 mb-6">
             <button
               onClick={() => setIsLoginMode(true)}
-              className={`flex-1 py-2.5 text-sm font-medium rounded-md transition-all ${
-                isLoginMode
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
+              className={`flex-1 py-2.5 text-sm font-medium rounded-md transition-all ${isLoginMode
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+                }`}
             >
               Login
             </button>
             <button
               onClick={() => setIsLoginMode(false)}
-              className={`flex-1 py-2.5 text-sm font-medium rounded-md transition-all ${
-                !isLoginMode
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
+              className={`flex-1 py-2.5 text-sm font-medium rounded-md transition-all ${!isLoginMode
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+                }`}
             >
               Sign Up
             </button>
@@ -220,7 +219,11 @@ export default function AuthPage() {
                   Password
                 </label>
                 {isLoginMode && (
-                  <button type="button" className="text-sm text-primary hover:underline">
+                  <button
+                    type="button"
+                    onClick={() => toast.info('Password reset link has been sent to your email')}
+                    className="text-sm text-primary hover:underline"
+                  >
                     Forgot Password?
                   </button>
                 )}
@@ -323,9 +326,27 @@ export default function AuthPage() {
           </p>
 
           <div className="flex items-center justify-center gap-4 mt-6 text-xs text-muted-foreground">
-            <a href="#" className="hover:text-foreground">Privacy Policy</a>
-            <a href="#" className="hover:text-foreground">Terms of Service</a>
-            <a href="#" className="hover:text-foreground">Help Center</a>
+            <a
+              href="#"
+              onClick={(e) => { e.preventDefault(); toast.info('Privacy Policy page will open soon'); }}
+              className="hover:text-foreground"
+            >
+              Privacy Policy
+            </a>
+            <a
+              href="#"
+              onClick={(e) => { e.preventDefault(); toast.info('Terms of Service page will open soon'); }}
+              className="hover:text-foreground"
+            >
+              Terms of Service
+            </a>
+            <a
+              href="#"
+              onClick={(e) => { e.preventDefault(); toast.info('Help Center will open soon'); }}
+              className="hover:text-foreground"
+            >
+              Help Center
+            </a>
           </div>
         </div>
       </div>

@@ -1,6 +1,4 @@
 import { create } from 'zustand';
-import { supabase } from '@/integrations/supabase/client';
-import { User, Session } from '@supabase/supabase-js';
 
 export type AppRole = 'admin' | 'student';
 
@@ -14,8 +12,7 @@ interface Profile {
 }
 
 interface AuthState {
-  user: User | null;
-  session: Session | null;
+  user: { id: string; email: string } | null;
   profile: Profile | null;
   role: AppRole | null;
   isAuthenticated: boolean;
@@ -28,32 +25,14 @@ interface AuthState {
   initialize: () => Promise<void>;
 }
 
-const fetchProfileAndRole = async (userId: string, set: any) => {
-  try {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
+// Mock user data for demo purposes
+const mockUsers = [
+  { id: '1', email: 'student@example.com', password: 'password', role: 'student' as AppRole, name: 'John Student' },
+  { id: '2', email: 'admin@example.com', password: 'password', role: 'admin' as AppRole, name: 'Admin User' }
+];
 
-    const { data: roleData } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    set({ 
-      profile: profile as Profile | null,
-      role: (roleData?.role as AppRole) ?? 'student'
-    });
-  } catch (error) {
-    console.error('Error fetching profile/role:', error);
-  }
-};
-
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
-  session: null,
   profile: null,
   role: null,
   isAuthenticated: false,
@@ -61,110 +40,119 @@ export const useAuthStore = create<AuthState>((set) => ({
   initialized: false,
 
   initialize: async () => {
-    // Set up auth state listener FIRST
-    supabase.auth.onAuthStateChange((event, session) => {
-      set({ 
-        session, 
-        user: session?.user ?? null,
-        isAuthenticated: !!session?.user 
-      });
-      
-      // Defer profile/role fetch to avoid deadlock
-      if (session?.user) {
-        setTimeout(() => {
-          fetchProfileAndRole(session.user.id, set);
-        }, 0);
-      } else {
-        set({ profile: null, role: null });
+    // Check localStorage for persisted session
+    const savedUser = localStorage.getItem('authUser');
+    if (savedUser) {
+      const user = JSON.parse(savedUser);
+      const mockUser = mockUsers.find(u => u.email === user.email);
+      if (mockUser) {
+        set({
+          user: { id: mockUser.id, email: mockUser.email },
+          profile: {
+            id: mockUser.id,
+            email: mockUser.email,
+            name: mockUser.name,
+            department: mockUser.role === 'student' ? 'Computer Science (B.Tech)' : 'Placement Cell',
+            batch: mockUser.role === 'student' ? '2024' : undefined,
+          },
+          role: mockUser.role,
+          isAuthenticated: true,
+          initialized: true
+        });
+        return;
       }
-    });
-
-    // THEN check for existing session
-    const { data: { session } } = await supabase.auth.getSession();
-    set({ 
-      session, 
-      user: session?.user ?? null,
-      isAuthenticated: !!session?.user,
-      initialized: true
-    });
-
-    if (session?.user) {
-      await fetchProfileAndRole(session.user.id, set);
     }
+    set({ initialized: true });
   },
 
   login: async (email: string, password: string) => {
     set({ isLoading: true });
     
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    set({ isLoading: false });
+    // Simulate API call delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
-    if (error) {
-      return { error: error.message };
+    const mockUser = mockUsers.find(u => u.email === email && u.password === password);
+    
+    if (mockUser) {
+      const user = { id: mockUser.id, email: mockUser.email };
+      localStorage.setItem('authUser', JSON.stringify(user));
+      
+      set({
+        user,
+        profile: {
+          id: mockUser.id,
+          email: mockUser.email,
+          name: mockUser.name,
+          department: mockUser.role === 'student' ? 'Computer Science (B.Tech)' : 'Placement Cell',
+          batch: mockUser.role === 'student' ? '2024' : undefined,
+        },
+        role: mockUser.role,
+        isAuthenticated: true,
+        isLoading: false
+      });
+      
+      return { error: null };
     }
     
-    return { error: null };
+    set({ isLoading: false });
+    return { error: 'Invalid email or password' };
   },
 
   signup: async (email: string, password: string, name: string, role: AppRole, department?: string, batch?: string) => {
     set({ isLoading: true });
     
-    const redirectUrl = `${window.location.origin}/`;
+    // Simulate API call delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          name,
-          role,
-          department: department || (role === 'student' ? 'Computer Science (B.Tech)' : 'Placement Cell'),
-          batch: batch || (role === 'student' ? '2024' : undefined),
-        },
-      },
-    });
-
-    set({ isLoading: false });
-    
-    if (error) {
-      if (error.message.includes('already registered')) {
-        return { error: 'This email is already registered. Please log in instead.' };
-      }
-      return { error: error.message };
+    // Check if user already exists
+    if (mockUsers.find(u => u.email === email)) {
+      set({ isLoading: false });
+      return { error: 'This email is already registered. Please log in instead.' };
     }
     
+    // In a real app, this would create a user in the database
+    // For demo, we'll just show success
+    set({ isLoading: false });
     return { error: null };
   },
 
   loginWithGoogle: async () => {
     set({ isLoading: true });
     
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/dashboard`,
-      },
-    });
-
-    set({ isLoading: false });
+    // Simulate OAuth delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
-    if (error) {
-      return { error: error.message };
+    // Mock Google login - auto-login as student
+    const mockUser = mockUsers.find(u => u.role === 'student');
+    if (mockUser) {
+      const user = { id: mockUser.id, email: mockUser.email };
+      localStorage.setItem('authUser', JSON.stringify(user));
+      
+      set({
+        user,
+        profile: {
+          id: mockUser.id,
+          email: mockUser.email,
+          name: mockUser.name,
+          department: 'Computer Science (B.Tech)',
+          batch: '2024',
+        },
+        role: 'student',
+        isAuthenticated: true,
+        isLoading: false
+      });
+      
+      return { error: null };
     }
     
-    return { error: null };
+    set({ isLoading: false });
+    return { error: 'Google login failed' };
   },
 
   logout: async () => {
-    await supabase.auth.signOut();
+    localStorage.removeItem('authUser');
     set({ 
       user: null, 
-      session: null, 
       profile: null, 
       role: null, 
       isAuthenticated: false 

@@ -1,12 +1,13 @@
 import { useParams, Link } from 'react-router-dom';
 import { Sidebar } from '@/components/Sidebar';
 import { StatusBadge } from '@/components/StatusBadge';
-import { mockCompanies, mockMessages } from '@/data/mockData';
+import { useCompany } from '@/hooks/useCompanies';
+import { useCompanyMessages, useSendMessage } from '@/hooks/useMessages';
+import { useRegisterForDrive } from '@/hooks/useRegistrations';
 import { useState } from 'react';
-import { Message, UserRole } from '@/types';
-import { 
-  MapPin, 
-  IndianRupee, 
+import {
+  MapPin,
+  IndianRupee,
   Users,
   Calendar,
   Briefcase,
@@ -19,10 +20,20 @@ import { useAuthStore } from '@/stores/authStore';
 
 export default function CompanyDetail() {
   const { id } = useParams<{ id: string }>();
-  const { user, profile, role } = useAuthStore();
-  const company = mockCompanies.find(c => c.id === id);
+  const { data: company, isLoading } = useCompany(id || '');
+  const { data: messages = [] } = useCompanyMessages(id || '');
+  const sendMessage = useSendMessage();
+  const registerForDrive = useRegisterForDrive();
+  const { profile } = useAuthStore();
   const [newMessage, setNewMessage] = useState('');
-  const [messages, setMessages] = useState<Message[]>(mockMessages);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   if (!company) {
     return (
@@ -32,38 +43,40 @@ export default function CompanyDetail() {
     );
   }
 
-  const handleSendMessage = () => {
-    if (newMessage.trim()) {
-      const message: Message = {
-        id: crypto.randomUUID(),
-        userId: user?.id || '1',
-        userName: profile?.name || 'You',
-        userRole: (role || 'student') as UserRole,
-        content: newMessage,
-        timestamp: new Date(),
-      };
-      setMessages([...messages, message]);
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !id) return;
+
+    try {
+      await sendMessage.mutateAsync({ companyId: id, content: newMessage });
       setNewMessage('');
-      toast.success('Message posted!');
+    } catch (error) {
+      // Error handled by mutation
     }
   };
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleTimeString('en-US', {
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
     });
   };
 
-  const handleRegister = () => {
-    toast.success(`Successfully registered for ${company.name}`);
+  const handleRegister = async () => {
+    if (id) {
+      try {
+        await registerForDrive.mutateAsync(id);
+      } catch (error) {
+        // Error handled by mutation
+      }
+    }
   };
 
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
-      
+
       <main className="ml-64 p-8">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
@@ -92,9 +105,9 @@ export default function CompanyDetail() {
                     <p className="text-lg text-muted-foreground">{company.role}</p>
                   </div>
                 </div>
-                
-                <button onClick={handleRegister} className="btn-primary">
-                  Register Now
+
+                <button onClick={handleRegister} disabled={registerForDrive.isPending} className="btn-primary">
+                  {registerForDrive.isPending ? 'Registering...' : 'Register Now'}
                   <span>→</span>
                 </button>
               </div>
@@ -107,6 +120,10 @@ export default function CompanyDetail() {
                 <span className="flex items-center gap-1">
                   <MapPin className="w-4 h-4" />
                   {company.location}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Users className="w-4 h-4" />
+                  {company.registration_count} registered
                 </span>
               </div>
 
@@ -135,75 +152,68 @@ export default function CompanyDetail() {
             </div>
 
             {/* Eligibility Criteria */}
-            {company.eligibility && (
-              <div className="bg-card rounded-xl p-6 border border-border">
-                <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
-                  <Users className="w-5 h-5 text-primary" />
-                  Eligibility Criteria
-                </h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">CGPA CUTOFF</p>
-                    <p className="font-semibold text-foreground">{company.eligibility.cgpa}</p>
-                    <p className="text-xs text-muted-foreground">No history of academic probation</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">ALLOWED BRANCHES</p>
-                    <p className="font-semibold text-foreground">{company.eligibility.branches.join(', ')}</p>
-                    <p className="text-xs text-muted-foreground">B.Tech & M.Tech</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">ACTIVE BACKLOGS</p>
-                    <p className="font-semibold text-foreground">{company.eligibility.backlogsAllowed} Allowed</p>
-                    <p className="text-xs text-muted-foreground">At time of joining</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">CLASS X & XII</p>
-                    <p className="font-semibold text-foreground">{company.eligibility.classRequirement}</p>
-                    <p className="text-xs text-muted-foreground">Board criteria</p>
-                  </div>
+            <div className="bg-card rounded-xl p-6 border border-border">
+              <h2 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                <Users className="w-5 h-5 text-primary" />
+                Eligibility Criteria
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">CGPA CUTOFF</p>
+                  <p className="font-semibold text-foreground">7.0 & Above</p>
+                  <p className="text-xs text-muted-foreground">No history of academic probation</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">ALLOWED BRANCHES</p>
+                  <p className="font-semibold text-foreground">CSE, IT, ECE</p>
+                  <p className="text-xs text-muted-foreground">B.Tech & M.Tech</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">ACTIVE BACKLOGS</p>
+                  <p className="font-semibold text-foreground">0 Allowed</p>
+                  <p className="text-xs text-muted-foreground">At time of joining</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">CLASS X & XII</p>
+                  <p className="font-semibold text-foreground">75% & Above</p>
+                  <p className="text-xs text-muted-foreground">Board criteria</p>
                 </div>
               </div>
-            )}
+            </div>
 
             {/* Selection Process */}
-            {company.selectionProcess && (
-              <div className="bg-card rounded-xl p-6 border border-border">
-                <h2 className="font-semibold text-foreground mb-6 flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-primary" />
-                  Selection Process
-                </h2>
-                <div className="flex items-center justify-between">
-                  {company.selectionProcess.map((step, index) => (
-                    <div key={step.id} className="flex items-center">
-                      <div className="flex flex-col items-center">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-medium text-sm ${
-                          step.isCompleted
-                            ? 'bg-primary text-primary-foreground'
-                            : step.isCurrent
-                            ? 'bg-primary text-primary-foreground ring-4 ring-primary/20'
-                            : 'bg-muted text-muted-foreground'
+            <div className="bg-card rounded-xl p-6 border border-border">
+              <h2 className="font-semibold text-foreground mb-6 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-primary" />
+                Selection Process
+              </h2>
+              <div className="flex items-center justify-between">
+                {[{ id: 1, title: 'Online Test', description: 'Aptitude & Coding', isCompleted: true },
+                { id: 2, title: 'Technical Interview', description: 'DS & Algorithms', isCurrent: true },
+                { id: 3, title: 'HR Interview', description: 'Behavioral & Culture Fit' }].map((step, index) => (
+                  <div key={step.id} className="flex items-center">
+                    <div className="flex flex-col items-center">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-medium text-sm ${step.isCompleted
+                        ? 'bg-primary text-primary-foreground'
+                        : step.isCurrent
+                          ? 'bg-primary text-primary-foreground ring-4 ring-primary/20'
+                          : 'bg-muted text-muted-foreground'
                         }`}>
-                          {step.isCompleted ? <Check className="w-5 h-5" /> : step.id}
-                        </div>
-                        <div className="mt-2 text-center">
-                          <p className="font-medium text-foreground text-sm">{step.title}</p>
-                          <p className="text-xs text-muted-foreground">{step.description}</p>
-                          {step.duration && (
-                            <p className="text-xs text-muted-foreground">({step.duration})</p>
-                          )}
-                        </div>
+                        {step.isCompleted ? <Check className="w-5 h-5" /> : step.id}
                       </div>
-                      {index < company.selectionProcess!.length - 1 && (
-                        <div className={`h-0.5 w-16 mx-4 ${
-                          step.isCompleted ? 'bg-primary' : 'bg-muted'
-                        }`} />
-                      )}
+                      <div className="mt-2 text-center">
+                        <p className="font-medium text-foreground text-sm">{step.title}</p>
+                        <p className="text-xs text-muted-foreground">{step.description}</p>
+                      </div>
                     </div>
-                  ))}
-                </div>
+                    {index < 2 && (
+                      <div className={`h-0.5 w-16 mx-4 ${step.isCompleted ? 'bg-primary' : 'bg-muted'
+                        }`} />
+                    )}
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
 
             {/* Discussion Thread */}
             <div className="bg-card rounded-xl p-6 border border-border">
@@ -218,20 +228,20 @@ export default function CompanyDetail() {
               {/* Messages */}
               <div className="space-y-4 max-h-96 overflow-y-auto mb-4">
                 {messages.map((message) => (
-                  <div key={message.id} className={`flex gap-3 p-3 rounded-lg ${message.isPinned ? 'bg-primary/5 border border-primary/20' : ''}`}>
+                  <div key={message.id} className={`flex gap-3 p-3 rounded-lg ${message.is_pinned ? 'bg-primary/5 border border-primary/20' : ''}`}>
                     <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
                       <span className="text-xs font-medium text-primary">
-                        {message.userName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        {message.profile?.name?.split(' ').map(n => n[0]).join('').slice(0, 2)}
                       </span>
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-foreground">{message.userName}</span>
-                        {message.isAdmin && (
+                        <span className="font-medium text-foreground">{message.profile?.name}</span>
+                        {message.user_role === 'admin' && (
                           <span className="px-2 py-0.5 text-xs bg-primary text-primary-foreground rounded">ADMIN</span>
                         )}
-                        <span className="text-xs text-muted-foreground">{formatDate(message.timestamp)}</span>
-                        {message.isPinned && <Pin className="w-3 h-3 text-primary" />}
+                        <span className="text-xs text-muted-foreground">{formatDate(message.created_at)}</span>
+                        {message.is_pinned && <Pin className="w-3 h-3 text-primary" />}
                       </div>
                       <p className="text-muted-foreground text-sm">{message.content}</p>
                     </div>
@@ -247,7 +257,7 @@ export default function CompanyDetail() {
                   onChange={(e) => setNewMessage(e.target.value)}
                   placeholder="Ask a question about this drive..."
                   className="input-field flex-1"
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage(e)}
                 />
                 <button onClick={handleSendMessage} className="btn-primary">
                   Post Question

@@ -1,8 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
-import { useEffect } from 'react';
 
 export interface Registration {
   id: string;
@@ -13,6 +11,26 @@ export interface Registration {
   updated_at: string;
 }
 
+// Mock registration data
+const mockRegistrations: Registration[] = [
+  {
+    id: '1',
+    user_id: '1',
+    company_id: '1',
+    status: 'registered',
+    created_at: '2024-01-10',
+    updated_at: '2024-01-10',
+  },
+  {
+    id: '2',
+    user_id: '1',
+    company_id: '2',
+    status: 'shortlisted',
+    created_at: '2024-01-08',
+    updated_at: '2024-01-12',
+  },
+];
+
 export function useUserRegistrations() {
   const { user } = useAuthStore();
 
@@ -20,14 +38,11 @@ export function useUserRegistrations() {
     queryKey: ['registrations', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-
-      const { data, error } = await supabase
-        .from('registrations')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-      return data as Registration[];
+      
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      return mockRegistrations.filter(reg => reg.user_id === user.id);
     },
     enabled: !!user?.id,
   });
@@ -37,16 +52,23 @@ export function useAllRegistrations() {
   return useQuery({
     queryKey: ['all-registrations'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('registrations')
-        .select(`
-          *,
-          profiles:user_id (name, email, department, batch),
-          companies:company_id (name, role)
-        `);
-
-      if (error) throw error;
-      return data;
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Mock enhanced data with user and company details
+      return mockRegistrations.map(reg => ({
+        ...reg,
+        profiles: {
+          name: reg.user_id === '1' ? 'John Student' : 'Jane Student',
+          email: reg.user_id === '1' ? 'student@example.com' : 'jane@example.com',
+          department: 'Computer Science (B.Tech)',
+          batch: '2024',
+        },
+        companies: {
+          name: reg.company_id === '1' ? 'Google' : reg.company_id === '2' ? 'Microsoft' : 'Amazon',
+          role: reg.company_id === '1' ? 'Software Engineer' : 'Software Development Engineer',
+        },
+      }));
     },
   });
 }
@@ -59,23 +81,24 @@ export function useRegisterForDrive() {
     mutationFn: async (companyId: string) => {
       if (!user?.id) throw new Error('Not authenticated');
 
-      const { data, error } = await supabase
-        .from('registrations')
-        .insert({
-          user_id: user.id,
-          company_id: companyId,
-          status: 'registered',
-        })
-        .select()
-        .single();
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      if (error) {
-        if (error.code === '23505') {
-          throw new Error('You are already registered for this drive');
-        }
-        throw error;
+      // Check if already registered
+      if (mockRegistrations.find(reg => reg.user_id === user.id && reg.company_id === companyId)) {
+        throw new Error('You are already registered for this drive');
       }
-      return data;
+
+      const newRegistration: Registration = {
+        id: Date.now().toString(),
+        user_id: user.id,
+        company_id: companyId,
+        status: 'registered',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      return newRegistration;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['registrations'] });
@@ -96,13 +119,10 @@ export function useUnregisterFromDrive() {
     mutationFn: async (companyId: string) => {
       if (!user?.id) throw new Error('Not authenticated');
 
-      const { error } = await supabase
-        .from('registrations')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('company_id', companyId);
-
-      if (error) throw error;
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      return { companyId };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['registrations'] });
@@ -113,31 +133,4 @@ export function useUnregisterFromDrive() {
       toast.error(error.message || 'Failed to unregister');
     },
   });
-}
-
-export function useRealtimeRegistrations() {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    const channel = supabase
-      .channel('registrations-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'registrations',
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['registrations'] });
-          queryClient.invalidateQueries({ queryKey: ['companies'] });
-          queryClient.invalidateQueries({ queryKey: ['all-registrations'] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
 }
